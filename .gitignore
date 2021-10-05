@@ -3,6 +3,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+*.DS_Store
+*.idea
+*.tar.gz
+*.tar
+*.zip
+*/replays/*.json
+
 # C extensions
 *.so
 
