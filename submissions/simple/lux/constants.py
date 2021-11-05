@@ -1,3 +1,6 @@
+from enum import Enum
+
+
 class Constants:
     class INPUT_CONSTANTS:
         RESEARCH_POINTS = "rp"
@@ -20,3 +23,10 @@ class Constants:
         WOOD = "wood"
         URANIUM = "uranium"
         COAL = "coal"
+    ALL_DIRECTIONS = [
+        DIRECTIONS.NORTH,
+        DIRECTIONS.WEST,
+        DIRECTIONS.SOUTH,
+        DIRECTIONS.EAST,
+        DIRECTIONS.CENTER
+    ]
