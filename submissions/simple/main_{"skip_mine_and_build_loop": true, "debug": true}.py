@@ -7,7 +7,7 @@ try:
 except:
     from .agent import agent
 
-raw_env = """{}"""
+raw_env = """{"skip_mine_and_build_loop": true, "debug": true}"""
 
 ENV = json.loads(raw_env)
 

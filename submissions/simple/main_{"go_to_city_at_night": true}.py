@@ -7,7 +7,7 @@ try:
 except:
     from .agent import agent
 
-raw_env = """{}"""
+raw_env = """{"go_to_city_at_night": true}"""
 
 ENV = json.loads(raw_env)
 

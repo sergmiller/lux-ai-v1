@@ -7,7 +7,7 @@ try:
 except:
     from .agent import agent
 
-raw_env = """{}"""
+raw_env = """{"use_size_as_distance": true}"""
 
 ENV = json.loads(raw_env)
 

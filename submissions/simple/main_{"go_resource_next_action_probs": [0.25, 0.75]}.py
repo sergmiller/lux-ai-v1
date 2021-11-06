@@ -7,7 +7,7 @@ try:
 except:
     from .agent import agent
 
-raw_env = """{}"""
+raw_env = """{"go_resource_next_action_probs": [0.25, 0.75]}"""
 
 ENV = json.loads(raw_env)
 

@@ -7,9 +7,12 @@ try:
 except:
     from .agent import agent
 
-raw_env = """{}"""
+raw_env = """{"go_resource_next_action_probs": [0.9, 0.1]}"""
 
-ENV = json.loads(raw_env)
+ENV = dict()
+
+if isinstance(raw_env, str):
+    ENV = json.loads(raw_env)
 
 if __name__ == "__main__":
     

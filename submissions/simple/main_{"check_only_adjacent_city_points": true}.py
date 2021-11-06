@@ -7,7 +7,7 @@ try:
 except:
     from .agent import agent
 
-raw_env = """{}"""
+raw_env = """{"check_only_adjacent_city_points": true}"""
 
 ENV = json.loads(raw_env)
 

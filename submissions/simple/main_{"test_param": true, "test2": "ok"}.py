@@ -7,9 +7,12 @@ try:
 except:
     from .agent import agent
 
-raw_env = """{}"""
+raw_env = """{"test_param": true, "test2": "ok"}"""
 
-ENV = json.loads(raw_env)
+ENV = dict()
+
+if isinstance(raw_env, str):
+    ENV = json.loads(raw_env)
 
 if __name__ == "__main__":
     
