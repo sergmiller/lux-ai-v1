@@ -25,13 +25,17 @@ ROUTINE_RULES = {
 ROUTINE_EXIT_CONDITIONS = {
     Routine.FREE: lambda _, __: True,
     Routine.GO_NEAREST_CITY: lambda unit, city_tiles: True if len(city_tiles) == 0 else max(unit.pos == city.pos for city in city_tiles) > 0,
-    Routine.GO_NEAREST_RESOURCE: lambda unit, _: unit_cargo_total(unit) > 0,
-    Routine.GO_BUILD_CITY: lambda unit, __: unit_cargo_total(unit) < 100
+    Routine.GO_NEAREST_RESOURCE: lambda unit, _: unit_cargo_total(unit) > ENV.get("stop_mining_threshold", 79),
+    Routine.GO_BUILD_CITY: lambda unit, __: unit_cargo_total(unit) < 100 if ENV.get("use_old_units_cargo_rules", True) else unit_cargo_fuel_total(unit) < 100
 }
 
 
 def unit_cargo_total(unit):
     return unit.cargo.wood + unit.cargo.coal + unit.cargo.uranium
+
+
+def unit_cargo_fuel_total(unit):
+    return unit.cargo.wood + unit.cargo.coal * 10 + unit.cargo.uranium * 40
 
 
 def perform_routine(env, turn, unit, city_tiles, routine_actions: dict):
@@ -50,7 +54,7 @@ def update_state(unit, city_tiles, turn):
     if ROUTINE_EXIT_CONDITIONS[state](unit, city_tiles):
         possibilities, weights = ROUTINE_RULES[state]
         if state == Routine.GO_NEAREST_RESOURCE:
-            weights = ENV.get("go_resource_next_action_probs", [0.5, 0.5])
+            weights = ENV.get("go_resource_next_action_probs", [0.1, 0.9])
         weights = np.array(weights)
         if ENV.get("norm_probs_to_city_tiles", False):
             weights = weights ** (1 / (1 + len(city_tiles)) ** 0.5)
