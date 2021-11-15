@@ -13,6 +13,7 @@ FEATURE_LOG_PATH = None
 FEATURE_CACHE = dict()
 
 MODEL = None
+TURN = 0
 
 
 def create_or_get_cb_model(model_path: str):
@@ -27,23 +28,87 @@ import torch
 from torch import nn
 
 
+MAP_F = 32 * 32 * 7
+
+MAP_F = 32 * 32 * 7
+
+
 class NNWithCustomFeatures(nn.Module):
     def __init__(self, INPUT_F, DROP_P, H, A=6):
         super().__init__()
-        INPUT_F_C = INPUT_F
-        self.model_ff = nn.Sequential(
-            nn.BatchNorm1d(INPUT_F_C),
+        INPUT_F_C = INPUT_F + 128
+        self.model_q = nn.Sequential(
             nn.Dropout(DROP_P),
             nn.Linear(INPUT_F_C, H),
+            nn.LayerNorm(H),
+            nn.ReLU(),
+            nn.Dropout(DROP_P),
+            nn.Linear(H, H),
+            nn.ReLU(),
+            nn.Dropout(DROP_P),
+            nn.Linear(H, H),
+            nn.ReLU(),
+            nn.Linear(H, A),
+            nn.ReLU()
+            #             nn.Sigmoid()
+        )
+
+        self.model_p = nn.Sequential(
+            nn.Dropout(DROP_P),
+            nn.Linear(INPUT_F_C, H),
+            nn.LayerNorm(H),
+            nn.ReLU(),
+            nn.Dropout(DROP_P),
+            nn.Linear(H, H),
             nn.ReLU(),
             nn.Dropout(DROP_P),
             nn.Linear(H, H),
             nn.ReLU(),
             nn.Linear(H, A)
+            #             nn.Sigmoid()
+        )
+
+        self.map_model = nn.Sequential(
+            nn.Conv2d(7, 64, 3),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # after -> (16,16)
+            nn.Conv2d(64, 128, 3),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # after -> (8, 8)
+            nn.Conv2d(128, 256, 3),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # after -> (4, 4)
+            #             nn.Conv2d(128, 256, 3),
+            #             nn.ReLU(inplace=True),
+            #             nn.MaxPool2d(2),  # after -> (1, 1)
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d((4, 4))
+        self.proj = nn.Sequential(
+            nn.Dropout(p=DROP_P),
+            nn.Linear(256 * 4 * 4, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=DROP_P),
+            nn.Linear(256, 128)
         )
 
     def forward(self, x):
-        return self.model_ff(x)
+        L = x.shape[1]
+        cur_r = self.forward_impl(x[:, :L // 2])
+        next_r = self.forward_impl(x[:, L // 2:])
+        return torch.cat([cur_r, next_r], dim=1)
+
+    def forward_impl(self, x):
+        mapp = x[:, -MAP_F:].reshape(-1, 32, 32, 7)
+        rest = x[:, :-MAP_F]
+        mapp = torch.transpose(mapp, 1, -1)
+        mapp = self.avgpool(self.map_model(mapp))
+        mapp = torch.flatten(mapp, 1)
+        mapp_f = self.proj(mapp)
+        #         print(mapp_f.shape)
+        input_x = torch.cat([rest, mapp_f], dim=1)
+        #         print(input_x.shape)
+        #         return self.model_q(input_x)
+        return torch.cat([self.model_q(input_x), self.model_p(input_x)], dim=1)
 
 
 class NNModelWrapper:
@@ -54,6 +119,8 @@ class NNModelWrapper:
         with torch.no_grad():
             _l = self.model.forward(torch.Tensor(x).reshape(1, -1)).cpu().detach().numpy().reshape(-1)
             _l = np.clip(_l, -30, 30)
+            assert _l.shape[0] == 12
+            _l = _l[6:]
             p = np.exp(_l) / np.sum(np.exp(_l))
             return p.reshape(1, -1)
 
@@ -62,7 +129,7 @@ def create_or_get_nn_model(model_path: str):
     global MODEL
     if MODEL is not None:
         return MODEL
-    model = NNWithCustomFeatures(63, 0.05, 64)
+    model = NNWithCustomFeatures(83, 0.05, 64)
     model.load_state_dict(torch.load(model_path))
     model.eval()
     MODEL = NNModelWrapper(model)
@@ -79,7 +146,7 @@ def create_or_get_file(log_path: str, features_keys, env):
     path = os.path.join(log_path, dp)
     FEATURE_LOG_PATH = path
     with open(path, "w") as f:
-        f.write("\t".join(features_keys) + "\taction\tmy_tiles\topp_tiles\n")
+        f.write("\t".join(features_keys) + "\taction\tmy_tiles\topp_tiles\tturn\tunit_id\n")
     print("FEATURE_LOG_PATH=" + FEATURE_LOG_PATH, file=sys.stderr)
     return path
 
@@ -243,8 +310,11 @@ def calc_map_features(game_state, my_cities, op_cities, width, height, player, o
 
 
 
-def calc_features(unit, game_state, action, turn, player, opponent, width, height, unit_routine, last_action, log_path):
-    global FEATURE_CACHE
+def calc_features(unit, game_state, turn, player, opponent, width, height, unit_routine, last_action, log_path):
+    global FEATURE_CACHE, TURN
+    TURN = turn
+    if (unit.id, turn) in FEATURE_CACHE:
+        return FEATURE_CACHE[(unit.id, turn)]
     city_tiles = calc_city_tiles(player)
     opp_city_tiles = calc_city_tiles(opponent)
     resource_tiles = calc_resource_tiles(height, width, game_state)
@@ -283,17 +353,17 @@ def calc_features(unit, game_state, action, turn, player, opponent, width, heigh
     features.update(common_features)
     features.update(map_features_dict)
     assert len(features) == 32 + 10 + 32 * 32 * 7, len(features)
-    FEATURE_CACHE[unit.id] = features
+    FEATURE_CACHE[(unit.id, turn)] = features
     return features
 
 
 def log_features(unit, game_state, action, turn, player, opponent, width, height, unit_routine, last_action, log_path, env):
-    features = calc_features(unit, game_state, action, turn, player, opponent, width, height, unit_routine, last_action, log_path)
+    features = calc_features(unit, game_state, turn, player, opponent, width, height, unit_routine, last_action, log_path)
 
     city_tiles = calc_city_tiles(player)
     opp_city_tiles = calc_city_tiles(opponent)
 
-    row = list(features.values()) + [action, len(city_tiles), len(opp_city_tiles)]
+    row = list(features.values()) + [action, len(city_tiles), len(opp_city_tiles), turn, unit.id]
 
     path = create_or_get_file(log_path, features.keys(), env)
 
@@ -302,8 +372,9 @@ def log_features(unit, game_state, action, turn, player, opponent, width, height
 
 
 CONVERTER = ['bcity', 'p', 'n', 's',  'e', 'w']
-CAT_FEATURES = [2, 3, 4, 6, 11, 16, 17, 22, 28, 29, 30, 31]
-FLOAT_FEATURES = [0, 1, 5, 7, 8, 9, 10, 12, 13, 14, 15, 18, 19, 20, 21, 23, 24, 25, 26, 27]
+# CAT_FEATURES = [2, 3, 4, 6, 11, 16, 17, 22, 28, 29, 30, 31]
+CAT_FEATURES = [2, 3, 4, 8, 14, 16, 22, 24, 25, 32, 38, 39, 40, 41]
+FLOAT_FEATURES = [i for i in np.arange(42 + 32 * 32 * 7) if i not in CAT_FEATURES]
 OHE = None
 
 
@@ -325,6 +396,7 @@ def prepare_features(features: list, env):
     ff = features[:, FLOAT_FEATURES]
     cf[cf == "False"] = False
     cf[cf == "True"] = True
+    cf[cf == None] = "None"
     # cf[cf == "0"] = 0
     cf[cf == "1"] = 1
     cf[cf == "2"] = 2
@@ -336,7 +408,7 @@ def prepare_features(features: list, env):
 
 
 def apply_model(model_path: str, unit, game_state, ENV) -> str:
-    features = FEATURE_CACHE.get(unit.id, None)
+    features = FEATURE_CACHE.get((unit.id, TURN), None)
     assert features is not None
     features = np.array(list(map(str,features.values()))).reshape(1, -1)
     if ENV.get("is_neural", False):
@@ -359,8 +431,15 @@ def apply_model(model_path: str, unit, game_state, ENV) -> str:
             break
         # print(features, probs, res, convert_prediction(res, unit.id), file=sys.stderr)
     else:
-        res = CONVERTER[model.predict(features)[0][0]]
+        probs = model.predict_proba(features)[0]
+        idx = np.argmax(probs)
+        res = CONVERTER[idx]
     return convert_prediction(res, unit.id)
+
+
+def make_random_action(_id: str) -> str:
+    idx = np.random.choice(6)
+    return convert_prediction(CONVERTER[idx], _id)
 
 
 def convert_prediction(p: str, _id: str) -> str:

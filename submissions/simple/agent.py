@@ -5,7 +5,7 @@ from lux.constants import Constants
 from lux.game_constants import GAME_CONSTANTS
 from lux import annotate
 from routines import perform_routine, Routine, ROUTINES
-from features_calcer import log_features, apply_model, calc_features
+from features_calcer import log_features, apply_model, calc_features, make_random_action
 
 import numpy as np
 
@@ -14,7 +14,7 @@ game_state = None
 ENV = None
 # ENV = {"model_path": "models/v5.cbm",  "use_policy": True, "use_old_units_cargo_rules": False}
 # ENV = {"use_old_units_cargo_rules": False}
-# ENV = {"model_path": "/kaggle_simulations/agent/models/v7.cbm", "use_policy": True, "use_old_units_cargo_rules": False}
+# ENV = {"model_path": "/kaggle_simulations/agent/models/v9.cbm", "use_policy": True, "use_old_units_cargo_rules": False, "model_activation_turn": 0, "model_activation_tiles": 10}
 # ENV = {"model_path": "models/v4.cbm", "use_policy": True}
 ACTIONS = dict()
 future_workers_pos = dict()
@@ -240,17 +240,12 @@ def agent(observation, env):
             if action is None:# or np.random.random() < ENV.get("random_pillage_prob", 0.0):
                 action = unit.pillage()
 
-            if log_path is not None:
-                unit_routine = ROUTINES.get(unit.id, Routine.FREE)
-                last_action = ACTIONS.get(unit.id, None)
-                log_features(unit, game_state, action, turn, player, opponent, width, height, unit_routine, last_action, log_path, ENV)
-
             default_action = action
 
-            if model_path is not None and turn >= ENV.get("model_activation_turn", 0):
+            if model_path is not None and turn >= ENV.get("model_activation_turn", 0) and len(city_tiles) >= ENV.get("model_activation_tiles", 0):
                 unit_routine = ROUTINES.get(unit.id, Routine.FREE)
                 last_action = ACTIONS.get(unit.id, None)
-                calc_features(unit, game_state, action, turn, player, opponent, width, height, unit_routine, last_action, log_path)
+                calc_features(unit, game_state, turn, player, opponent, width, height, unit_routine, last_action, log_path)
                 action = apply_model(model_path, unit, game_state, ENV)
             # else:
             #     assert False
@@ -258,6 +253,13 @@ def agent(observation, env):
             if np.random.random() < ENV.get("prob_use_default_agent", 0.0):
                 action = default_action
 
+            if np.random.random() < ENV.get("prob_use_random", 0.0):
+                action = make_random_action(unit.id)
+
+            if log_path is not None:
+                unit_routine = ROUTINES.get(unit.id, Routine.FREE)
+                last_action = ACTIONS.get(unit.id, None)
+                log_features(unit, game_state, action, turn, player, opponent, width, height, unit_routine, last_action, log_path, ENV)
 
             ACTIONS[unit.id] = action
             actions.append(action)

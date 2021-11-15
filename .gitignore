@@ -9,6 +9,7 @@ __pycache__/
 *research/runs*
 *research/datasets*
 *submissions/simple/main_*
+*submissions/simple/models/*iter_v*
 
 *.DS_Store
 *.idea
