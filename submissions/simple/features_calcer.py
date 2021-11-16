@@ -117,7 +117,7 @@ class NNModelWrapper:
 
     def predict_proba(self, x: np.array) -> np.array:
         with torch.no_grad():
-            _l = self.model.forward(torch.Tensor(x).reshape(1, -1)).cpu().detach().numpy().reshape(-1)
+            _l = self.model.forward_impl(torch.Tensor(x).reshape(1, -1)).cpu().detach().numpy().reshape(-1)
             _l = np.clip(_l, -30, 30)
             assert _l.shape[0] == 12
             _l = _l[6:]
@@ -129,7 +129,7 @@ def create_or_get_nn_model(model_path: str):
     global MODEL
     if MODEL is not None:
         return MODEL
-    model = NNWithCustomFeatures(83, 0.05, 64)
+    model = NNWithCustomFeatures(83, 0.05, 128)
     model.load_state_dict(torch.load(model_path))
     model.eval()
     MODEL = NNModelWrapper(model)

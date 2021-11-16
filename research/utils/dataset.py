@@ -20,11 +20,13 @@ def read_files_in_dir(_dir: str)->list:
 
 def calc_weights(city_tiles: np.array, opp_city_tiles: np.array, turns: np.array, unit_ids: np.array, r) -> np.array:
 #     target_fn=lambda my, opp: my * turns * 1e-5 #np.ones_like(my) / 500
-    target_fn=lambda my, opp: my * 1e-4
-#     target_fn=lambda my, opp: np.zeros_like(my)
+#     target_fn=lambda my, opp: my * 1e-4
+    target_fn=lambda my, opp: np.zeros_like(my)
     time_vals = target_fn(city_tiles, opp_city_tiles)
     assert r is not None
-    time_vals[np.where(turns == np.max(turns))] = r
+    last_turn_ids = np.where(turns == 359)
+#     time_vals[np.where(turns == np.max(turns))] = my[np.where(turns == np.max(turns))]
+    time_vals[last_turn_ids] = city_tiles[last_turn_ids]
     return time_vals
 
 
