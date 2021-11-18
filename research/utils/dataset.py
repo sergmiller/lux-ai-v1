@@ -24,10 +24,10 @@ def calc_weights(city_tiles: np.array, opp_city_tiles: np.array, turns: np.array
     target_fn=lambda my, opp: np.zeros_like(my)
     time_vals = target_fn(city_tiles, opp_city_tiles)
     assert r is not None
-    last_turn_ids = np.where(turns == 359)
+    last_turn_ids = np.where(turns == np.max(turns))
 #     time_vals[np.where(turns == np.max(turns))] = my[np.where(turns == np.max(turns))]
-    time_vals[last_turn_ids] = city_tiles[last_turn_ids]
-    return time_vals
+    time_vals[last_turn_ids] = city_tiles[last_turn_ids] - opp_city_tiles[last_turn_ids]
+    return time_vals * 1e-2
 
 
 CONVERTER = { 'bcity': 0, 'p': 1, 'n': 2, 's': 3,  'e': 4, 'w': 5}
