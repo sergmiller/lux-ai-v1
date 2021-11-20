@@ -129,7 +129,7 @@ def create_or_get_nn_model(model_path: str):
     global MODEL
     if MODEL is not None:
         return MODEL
-    model = NNWithCustomFeatures(83, 0.05, 128)
+    model = NNWithCustomFeatures(83, 0.05, 64)
     model.load_state_dict(torch.load(model_path))
     model.eval()
     MODEL = NNModelWrapper(model)

@@ -24,10 +24,14 @@ def calc_weights(city_tiles: np.array, opp_city_tiles: np.array, turns: np.array
     target_fn=lambda my, opp: np.zeros_like(my)
     time_vals = target_fn(city_tiles, opp_city_tiles)
     assert r is not None
-    last_turn_ids = np.where(turns == np.max(turns))
+    unit2turn=dict()
+    for i, u in enumerate(unit_ids):
+        unit2turn[u] = i
+    last_turn_ids = np.array(list(unit2turn.values()))
 #     time_vals[np.where(turns == np.max(turns))] = my[np.where(turns == np.max(turns))]
-    time_vals[last_turn_ids] = city_tiles[last_turn_ids] - opp_city_tiles[last_turn_ids]
-    return time_vals * 1e-2
+    time_vals[last_turn_ids] = 2 * (r - 0.5)
+    #time_vals[last_turn_ids] = city_tiles[last_turn_ids] - opp_city_tiles[last_turn_ids]
+    return time_vals
 
 
 CONVERTER = { 'bcity': 0, 'p': 1, 'n': 2, 's': 3,  'e': 4, 'w': 5}
@@ -86,7 +90,7 @@ def concat_datasets(_d: list)-> Dataset:
     features = np.concatenate([d.features for d in _d], axis=0)
     targets = np.concatenate([d.targets for d in _d], axis=0)
     weights = np.concatenate([d.weights for d in _d], axis=0)
-    assert _d.next_state_id is None
+    #assert _d.next_state_id is None
     return Dataset(features, targets, weights)
 
 
