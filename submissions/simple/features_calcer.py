@@ -130,7 +130,7 @@ def create_or_get_nn_model(model_path: str):
     if MODEL is not None:
         return MODEL
     model = NNWithCustomFeatures(83, 0.05, 64)
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path), strict=False)
     model.eval()
     MODEL = NNModelWrapper(model)
     return MODEL
@@ -420,6 +420,9 @@ def apply_model(model_path: str, unit, game_state, ENV) -> str:
         probs = model.predict_proba(features)[0]
         classes = CONVERTER
         res = None
+        if not unit.can_build(game_state.map):
+            probs[0] = 0
+            probs = probs / np.sum(probs)
         for _ in np.arange(20):
             res = np.random.choice(classes, p=probs)
             if res == 'bcity' and not unit.can_build(game_state.map):
@@ -427,6 +430,7 @@ def apply_model(model_path: str, unit, game_state, ENV) -> str:
             if res not in ['bcity', 'p']:
                 next_cell = unit.pos.translate(res, 1)
                 if next_cell.x < 0 or next_cell.x >= game_state.map.width or next_cell.y < 0 or next_cell.y >= game_state.map.height:
+                    probs = probs / np.sum(probs)
                     continue
             break
         # print(features, probs, res, convert_prediction(res, unit.id), file=sys.stderr)
